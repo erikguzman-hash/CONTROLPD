@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONTROLPD - HGIO</title>
+    <link rel="icon" type="image/x-icon" href="https://hgio-basics-images.s3.us-east-1.amazonaws.com/hgio-logos/apps-logos/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Montserrat', 'sans-serif'] },
+                    colors: { 'hgio-blue': { DEFAULT: '#153054', dark: '#102440' }, 'hgio-green': { DEFAULT: '#4c9200', light: '#80ba27' }, 'hgio-gray': '#858482' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-image: url('https://hgio-basics-images.s3.us-east-1.amazonaws.com/hgio-fondos/background.png'); background-size: cover; background-position: center; background-attachment: fixed; }
+        .loader { border-top-color: #4c9200; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal { display: none; }
+        .modal.is-open { display: flex; }
+        .fc-daygrid-event { white-space: normal; }
+        .fc-event { cursor: pointer; }
+        .tab-btn.active { border-color: #153054; background-color: #153054; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .status-solicitado { background-color: #E0E7FF; color: #3730A3; }
+        .status-pendiente { background-color: #FEF3C7; color: #92400E; }
+        .status-aprobado-coord { background-color: #D1FAE5; color: #065F46; }
+        .status-aprobado-dir { background-color: #C6F6D5; color: #22543D; }
+        .status-rechazado { background-color: #FEE2E2; color: #991B1B; }
+        .status-finalizado { background-color: #E5E7EB; color: #374151; }
+
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Vistas Principales -->
+    <div id="loading-view" class="min-h-screen flex items-center justify-center bg-white"><div class="loader h-32 w-32"></div></div>
+
+    <div id="login-view" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="text-center mb-8">
+                <img src="https://hgio.co/wp-content/uploads/Logo_Transparente-41.webp" alt="Logo HGIO" class="h-24 w-auto mx-auto object-contain">
+                <h1 class="text-2xl font-bold text-hgio-blue mt-4">CONTROLPD</h1>
+                <p class="text-hgio-gray mt-1">Inicia sesión para continuar</p>
+            </div>
+            <div class="space-y-4">
+                <button id="google-signin-button" class="w-full flex items-center justify-center py-2.5 px-4 border rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 48 48"><path fill="#4285F4" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20c0-1.341-.138-2.65-.389-3.917z"></path><path fill="#34A853" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#FBBC05" d="M27.463,25.309l-6.571,4.819C20.534,34.91,19.287,36,17.64,36c-3.356,0-6.21-2.344-7.175-5.443l-6.571,4.819C6.963,42.422,12.682,46,20,46c6.627,0,12-5.373,12-12c0-2.42-0.734-4.645-2.039-6.539z"></path><path fill="#EA4335" d="M20.184,43.725l6.571-4.819C29.463,34.91,30.713,36,32.36,36c3.356,0,6.21-2.344-7.175-5.443l6.571,4.819C41.037,42.422,35.318,46,28,46C25.463,46,22.926,45.28,20.184,43.725z"></path></svg>
+                    Iniciar Sesión con Google
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-view" class="hidden">
+        <header class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                <div class="flex items-center space-x-3"><img src="https://hgio.co/wp-content/uploads/Logo_Transparente-41.webp" alt="Logo HGIO" class="h-12 w-auto object-contain"><h1 class="text-xl font-bold text-hgio-blue">CONTROLPD</h1></div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <span id="user-name" class="font-semibold text-hgio-blue block"></span>
+                        <span id="user-role" class="text-xs text-hgio-gray block"></span>
+                    </div>
+                    <button id="logout-button" class="text-sm bg-hgio-blue text-white py-2 px-4 rounded-md font-semibold">Cerrar Sesión</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="mb-6 flex justify-between items-center">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                        <button class="tab-btn active whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm" data-tab="calendar">Calendario</button>
+                        <button class="tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500" data-tab="dashboard">Estadísticas</button>
+                        <button id="admin-tab-btn" class="tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 hidden" data-tab="admin">Admin</button>
+                    </nav>
+                </div>
+                 <button id="create-task-btn" class="bg-hgio-green text-white font-bold py-2 px-5 rounded-lg shadow-md hover:bg-hgio-green-light">+ Nueva Tarea</button>
+            </div>
+
+            <!-- Contenidos de las Pestañas -->
+            <div id="calendar-content" class="tab-content active bg-white p-4 rounded-lg shadow-md"><div id="calendar"></div></div>
+            <div id="dashboard-content" class="tab-content"><div id="stats-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div></div>
+            <div id="admin-content" class="tab-content bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold text-hgio-blue mb-4">Gestión de Usuarios</h2>
+                <div id="user-management-table" class="overflow-x-auto"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para Crear/Editar Tarea -->
+    <div id="task-modal" class="modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <form id="task-form" class="w-full">
+                <div class="p-5 border-b flex justify-between items-center">
+                    <h2 id="task-modal-title" class="text-2xl font-bold text-hgio-blue"></h2>
+                    <button type="button" class="close-modal-btn text-3xl text-hgio-gray hover:text-black">&times;</button>
+                </div>
+                <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <input type="hidden" id="task-id">
+                    <div>
+                        <label for="task-title" class="block text-sm font-medium text-gray-700">Título de la Tarea</label>
+                        <input type="text" id="task-title" class="mt-1 w-full p-2 border rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="task-description" class="block text-sm font-medium text-gray-700">Descripción</label>
+                        <textarea id="task-description" rows="4" class="mt-1 w-full p-2 border rounded-md"></textarea>
+                    </div>
+                    <div>
+                        <label for="task-assignee" class="block text-sm font-medium text-gray-700">Asignar a</label>
+                        <select id="task-assignee" class="mt-1 w-full p-2 border rounded-md bg-white" required></select>
+                    </div>
+                     <div>
+                        <label for="task-due-date" class="block text-sm font-medium text-gray-700">Fecha de Entrega</label>
+                        <input type="date" id="task-due-date" class="mt-1 w-full p-2 border rounded-md" required>
+                    </div>
+                    <div id="task-details-readonly" class="hidden space-y-3 text-sm"></div>
+                </div>
+                <div id="task-modal-footer" class="p-4 bg-gray-50 border-t flex justify-end items-center space-x-3"></div>
+            </form>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDoc, setDoc, addDoc, onSnapshot, serverTimestamp, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Importación segura de la configuración de Firebase
+        import { firebaseConfig } from './firebase-config.js';
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // ... El resto del código de la aplicación irá aquí ...
+
+    </script>
+</body>
+</html>
+
