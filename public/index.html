@@ -41,12 +41,10 @@
         .status-aprobado-dir { background-color: #C6F6D5; color: #22543D; }
         .status-rechazado { background-color: #FEE2E2; color: #991B1B; }
         .status-finalizado { background-color: #E5E7EB; color: #374151; }
-
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Vistas Principales -->
     <div id="loading-view" class="min-h-screen flex items-center justify-center bg-white"><div class="loader h-32 w-32"></div></div>
 
     <div id="login-view" class="hidden min-h-screen flex items-center justify-center p-4">
@@ -91,7 +89,6 @@
                  <button id="create-task-btn" class="bg-hgio-green text-white font-bold py-2 px-5 rounded-lg shadow-md hover:bg-hgio-green-light">+ Nueva Tarea</button>
             </div>
 
-            <!-- Contenidos de las Pestañas -->
             <div id="calendar-content" class="tab-content active bg-white p-4 rounded-lg shadow-md"><div id="calendar"></div></div>
             <div id="dashboard-content" class="tab-content"><div id="stats-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div></div>
             <div id="admin-content" class="tab-content bg-white p-6 rounded-lg shadow-md">
@@ -101,7 +98,6 @@
         </main>
     </div>
 
-    <!-- Modal para Crear/Editar Tarea -->
     <div id="task-modal" class="modal fixed inset-0 bg-black bg-opacity-60 items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
             <form id="task-form" class="w-full">
@@ -134,448 +130,452 @@
         </div>
     </div>
     
-    <!-- Carga la configuración de Firebase PRIMERO -->
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyB8-KNE_60SD9OmavwOG816L5dGxOAgzO4",
-            authDomain: "weekpd.firebaseapp.com",
-            projectId: "weekpd",
-            storageBucket: "weekpd.firebasestorage.app",
-            messagingSenderId: "712077553599",
-            appId: "1:712077553599:web:07fa4b6309af0e50ecfb0a",
-            measurementId: "G-CXM1ZQ7VFL"
-        };
-    </script>
-
-    <!-- Carga las librerías de Firebase (versión de compatibilidad) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    
+    <script type="module">
+        import { firebaseConfig } from './firebase-config.js';
 
-    <script>
-        // Ya no es 'type="module"'
-
-        // Inicializa Firebase
+        // --- INICIALIZACIÓN DE FIREBASE ---
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-
-        // Conecta a los emuladores si se está en localhost
-        if (window.location.hostname === "localhost") {
-            console.log("Testing with emulators");
-            auth.useEmulator("http://localhost:9099");
-            db.useEmulator("localhost", 8080);
-        }
         const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp;
 
-        // Vistas
-        const loadingView = document.getElementById('loading-view');
-        const loginView = document.getElementById('login-view');
-        const appView = document.getElementById('app-view');
-
-        // Botones
-        const googleSigninButton = document.getElementById('google-signin-button');
-        const logoutButton = document.getElementById('logout-button');
-        const createTaskBtn = document.getElementById('create-task-btn');
-
-        // Info de Usuario
-        const userNameSpan = document.getElementById('user-name');
-        const userRoleSpan = document.getElementById('user-role');
-
-        // Pestañas
-        const adminTabBtn = document.getElementById('admin-tab-btn');
-        const tabs = document.querySelectorAll('.tab-btn');
-        const tabContents = document.querySelectorAll('.tab-content');
-
-        // Modal de Tarea
-        const taskModal = document.getElementById('task-modal');
-        const taskModalTitle = document.getElementById('task-modal-title');
-        const taskForm = document.getElementById('task-form');
-        const closeModalBtns = document.querySelectorAll('.close-modal-btn');
-
-        let currentUser = null;
-        let currentUserRole = null;
-        let calendar;
-
-        // --- AUTENTICACIÓN ---
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                currentUser = user;
-                const userDocRef = db.collection("users").doc(user.uid);
-                const userDoc = await userDocRef.get();
-
-                if (userDoc.exists) {
-                    currentUserRole = userDoc.data().role;
-                } else {
-                    // Si el usuario no existe, lo creamos con rol 'equipo'
-                    await userDocRef.set({
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: user.displayName,
-                        role: 'equipo',
-                        createdAt: serverTimestamp()
-                    });
-                    currentUserRole = 'equipo';
-                }
-
-                userNameSpan.textContent = user.displayName;
-                userRoleSpan.textContent = currentUserRole.charAt(0).toUpperCase() + currentUserRole.slice(1);
-
-                if (currentUserRole === 'director' || currentUserRole === 'coordinador') {
-                    adminTabBtn.classList.remove('hidden');
-                }
-
-                loadingView.classList.add('hidden');
-                loginView.classList.add('hidden');
-                appView.classList.remove('hidden');
-                
-                initializeCalendar();
-                loadTasks();
-                loadDashboard();
-
-            } else {
-                currentUser = null;
-                currentUserRole = null;
-                loadingView.classList.add('hidden');
-                appView.classList.add('hidden');
-                loginView.classList.remove('hidden');
-            }
-        });
-
-        googleSigninButton.addEventListener('click', async () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            try {
-                await auth.signInWithPopup(provider);
-            } catch (error) {
-                console.error("Error al iniciar sesión con Google:", error);
-            }
-        });
-
-        logoutButton.addEventListener('click', async () => {
-            try {
-                await auth.signOut();
-            } catch (error) {
-                console.error("Error al cerrar sesión:", error);
-            }
-        });
-
-        // --- NAVEGACIÓN DE PESTAÑAS ---
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                const tabName = tab.dataset.tab;
-                tabContents.forEach(content => {
-                    content.classList.remove('active');
-                    if (content.id === `${tabName}-content`) {
-                        content.classList.add('active');
-                    }
-                });
-            });
-        });
-        
-        // --- CALENDARIO ---
-        function initializeCalendar() {
-            const calendarEl = document.getElementById('calendar');
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,listWeek'
+        // --- OBJETO PRINCIPAL DE LA APLICACIÓN ---
+        const App = {
+            state: {
+                currentUser: null,
+                currentUserRole: null,
+                calendar: null,
+                unsubscribeTasks: null, // Para detener el listener de Firestore
+            },
+            
+            ui: {
+                elements: {
+                    loadingView: document.getElementById('loading-view'),
+                    loginView: document.getElementById('login-view'),
+                    appView: document.getElementById('app-view'),
+                    googleSigninButton: document.getElementById('google-signin-button'),
+                    logoutButton: document.getElementById('logout-button'),
+                    createTaskBtn: document.getElementById('create-task-btn'),
+                    userNameSpan: document.getElementById('user-name'),
+                    userRoleSpan: document.getElementById('user-role'),
+                    adminTabBtn: document.getElementById('admin-tab-btn'),
+                    tabs: document.querySelectorAll('.tab-btn'),
+                    tabContents: document.querySelectorAll('.tab-content'),
+                    taskModal: document.getElementById('task-modal'),
+                    taskModalTitle: document.getElementById('task-modal-title'),
+                    taskForm: document.getElementById('task-form'),
+                    closeModalBtns: document.querySelectorAll('.close-modal-btn'),
+                    userManagementTable: document.getElementById('user-management-table'),
+                    statsContainer: document.getElementById('stats-container'),
                 },
-                locale: 'es',
-                events: [],
-                eventClick: function(info) {
-                    openTaskModal(info.event.id);
+
+                showView(view) {
+                    this.elements.loadingView.classList.add('hidden');
+                    this.elements.loginView.classList.add('hidden');
+                    this.elements.appView.classList.add('hidden');
+                    if (view === 'loading') this.elements.loadingView.classList.remove('hidden');
+                    if (view === 'login') this.elements.loginView.classList.remove('hidden');
+                    if (view === 'app') this.elements.appView.classList.remove('hidden');
+                },
+
+                updateUserInfo(user, role) {
+                    this.elements.userNameSpan.textContent = user.displayName;
+                    const roleCapitalized = role.charAt(0).toUpperCase() + role.slice(1);
+                    this.elements.userRoleSpan.textContent = roleCapitalized;
+                    if (role === 'director' || role === 'coordinador') {
+                        this.elements.adminTabBtn.classList.remove('hidden');
+                    } else {
+                        this.elements.adminTabBtn.classList.add('hidden');
+                    }
+                },
+                
+                resetAppView() {
+                     if (App.state.unsubscribeTasks) App.state.unsubscribeTasks();
+                     this.elements.adminTabBtn.classList.add('hidden');
+                     this.elements.userNameSpan.textContent = '';
+                     this.elements.userRoleSpan.textContent = '';
+                },
+            },
+
+            auth: {
+                async handleAuthStateChange(user) {
+                    if (user) {
+                        App.state.currentUser = user;
+                        const userDoc = await App.firestore.getUser(user.uid);
+
+                        if (userDoc.exists) {
+                            App.state.currentUserRole = userDoc.data().role;
+                        } else {
+                            await App.firestore.createUser(user);
+                            App.state.currentUserRole = 'equipo';
+                        }
+                        
+                        App.ui.updateUserInfo(user, App.state.currentUserRole);
+                        App.ui.showView('app');
+                        App.calendar.initialize();
+                        App.firestore.listenForTasks();
+                    } else {
+                        App.state.currentUser = null;
+                        App.state.currentUserRole = null;
+                        App.ui.resetAppView();
+                        App.ui.showView('login');
+                    }
+                },
+                
+                async signInWithGoogle() {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    try {
+                        await auth.signInWithPopup(provider);
+                    } catch (error) {
+                        console.error("Error al iniciar sesión con Google:", error);
+                        alert("Error al iniciar sesión. Verifica la consola para más detalles.");
+                    }
+                },
+
+                async signOut() {
+                    try {
+                        await auth.signOut();
+                    } catch (error) {
+                        console.error("Error al cerrar sesión:", error);
+                        alert("Error al cerrar sesión. Verifica la consola para más detalles.");
+                    }
+                },
+            },
+            
+            firestore: {
+                getUser: (uid) => db.collection("users").doc(uid).get(),
+                
+                createUser: (user) => db.collection("users").doc(user.uid).set({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    role: 'equipo',
+                    createdAt: serverTimestamp()
+                }),
+                
+                listenForTasks() {
+                    App.state.unsubscribeTasks = db.collection("tasks").onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            const taskData = change.doc.data();
+                            const event = App.calendar.formatTaskToEvent(taskData, change.doc.id);
+
+                            if (change.type === "added") {
+                                App.state.calendar.addEvent(event);
+                            }
+                            if (change.type === "modified") {
+                                const existingEvent = App.state.calendar.getEventById(change.doc.id);
+                                if (existingEvent) existingEvent.remove();
+                                App.state.calendar.addEvent(event);
+                            }
+                            if (change.type === "removed") {
+                                const existingEvent = App.state.calendar.getEventById(change.doc.id);
+                                if (existingEvent) existingEvent.remove();
+                            }
+                        });
+                    });
                 }
-            });
-            calendar.render();
-        }
+            },
 
-        function getStatusColor(status) {
-            switch (status) {
-                case 'solicitado': return '#E0E7FF';
-                case 'pendiente': return '#FEF3C7';
-                case 'aprobado-coord': return '#D1FAE5';
-                case 'aprobado-dir': return '#C6F6D5';
-                case 'rechazado': return '#FEE2E2';
-                case 'finalizado': return '#E5E7EB';
-                default: return '#F3F4F6';
-            }
-        }
+            calendar: {
+                initialize() {
+                    const calendarEl = document.getElementById('calendar');
+                     if (App.state.calendar) App.state.calendar.destroy();
 
-        function loadTasks() {
-            db.collection("tasks").onSnapshot((snapshot) => {
-                const events = [];
-                snapshot.forEach((doc) => {
-                    const task = doc.data();
-                    events.push({
-                        id: doc.id,
+                    App.state.calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
+                        locale: 'es',
+                        eventClick: (info) => App.tasks.openModal(info.event.id),
+                    });
+                    App.state.calendar.render();
+                },
+
+                getStatusColor(status) {
+                    const colors = {
+                        'solicitado': '#E0E7FF', 'pendiente': '#FEF3C7', 'aprobado-coord': '#D1FAE5',
+                        'aprobado-dir': '#C6F6D5', 'rechazado': '#FEE2E2', 'finalizado': '#E5E7EB'
+                    };
+                    return colors[status] || '#F3F4F6';
+                },
+
+                formatTaskToEvent(task, id) {
+                    const color = this.getStatusColor(task.status);
+                    return {
+                        id: id,
                         title: task.title,
                         start: task.dueDate,
                         allDay: true,
-                        backgroundColor: getStatusColor(task.status),
-                        borderColor: getStatusColor(task.status)
+                        backgroundColor: color,
+                        borderColor: color,
+                        textColor: '#1F2937' // Mejor contraste
+                    };
+                },
+            },
+
+            tasks: {
+                 async openModal(taskId = null) {
+                    App.ui.elements.taskForm.reset();
+                    await this.populateUsersDropdown();
+
+                    const { taskDetailsReadonly, taskModalFooter } = App.ui.elements;
+                    const formInputs = [
+                        document.getElementById('task-title'), document.getElementById('task-description'),
+                        document.getElementById('task-assignee'), document.getElementById('task-due-date')
+                    ];
+                    
+                    taskDetailsReadonly.classList.add('hidden');
+                    taskModalFooter.innerHTML = '';
+                    formInputs.forEach(input => {
+                        input.parentElement.style.display = 'block'; // Mostrar el div contenedor
+                        input.disabled = false;
+                    });
+                    
+                    if (taskId) {
+                        App.ui.elements.taskModalTitle.textContent = 'Detalles de la Tarea';
+                        const taskDoc = await db.collection("tasks").doc(taskId).get();
+
+                        if (taskDoc.exists) {
+                            const task = taskDoc.data();
+                            document.getElementById('task-id').value = taskId;
+                            
+                            // Vista de solo lectura
+                            if (App.state.currentUser.uid !== task.creatorId && App.state.currentUserRole === 'equipo') {
+                                formInputs.forEach(input => input.parentElement.style.display = 'none');
+                                taskDetailsReadonly.classList.remove('hidden');
+                                taskDetailsReadonly.innerHTML = `
+                                    <p><strong>Título:</strong> ${task.title}</p>
+                                    <p><strong>Descripción:</strong> ${task.description || 'N/A'}</p>
+                                    <p><strong>Asignado a:</strong> ${task.assigneeName}</p>
+                                    <p><strong>Fecha de Entrega:</strong> ${task.dueDate}</p>
+                                    <p><strong>Estado:</strong> <span class="status-badge status-${task.status}">${task.status}</span></p>`;
+                            } else { // Vista de edición
+                                document.getElementById('task-title').value = task.title;
+                                document.getElementById('task-description').value = task.description || '';
+                                document.getElementById('task-assignee').value = task.assigneeId;
+                                document.getElementById('task-due-date').value = task.dueDate;
+                            }
+                            this.addWorkflowButtons(taskModalFooter, task, taskId);
+                        }
+                    } else {
+                        App.ui.elements.taskModalTitle.textContent = 'Crear Nueva Tarea';
+                        document.getElementById('task-id').value = '';
+                        taskModalFooter.innerHTML = '<button type="submit" class="bg-hgio-green text-white font-bold py-2 px-5 rounded-lg">Guardar Tarea</button>';
+                    }
+                    App.ui.elements.taskModal.classList.add('is-open');
+                },
+
+                addWorkflowButtons(container, task, taskId) {
+                    container.innerHTML = '';
+                    const taskDocRef = db.collection("tasks").doc(taskId);
+                    const { currentUser, currentUserRole } = App.state;
+
+                    // Botón de Guardar
+                    if (currentUser.uid === task.creatorId || currentUserRole === 'coordinador' || currentUserRole === 'director') {
+                        container.appendChild(this.createButton('submit', 'Guardar Cambios', 'bg-hgio-blue'));
+                    }
+                    // Botón Aprobar (Coord)
+                    if (currentUserRole === 'coordinador' && task.status === 'solicitado') {
+                         container.appendChild(this.createButton('button', 'Aprobar (Coord.)', 'bg-green-500', () => taskDocRef.update({ status: 'aprobado-coord' })));
+                    }
+                    // Botón Aprobar (Dir)
+                    if (currentUserRole === 'director' && task.status === 'aprobado-coord') {
+                        container.appendChild(this.createButton('button', 'Aprobar (Dir.)', 'bg-green-700', () => taskDocRef.update({ status: 'aprobado-dir' })));
+                    }
+                    // Botón Rechazar
+                    if ((currentUserRole === 'coordinador' && task.status === 'solicitado') || (currentUserRole === 'director' && task.status === 'aprobado-coord')) {
+                         container.appendChild(this.createButton('button', 'Rechazar', 'bg-red-500', () => taskDocRef.update({ status: 'rechazado' })));
+                    }
+                    // Botón Finalizar Tarea
+                    if (task.assigneeId === currentUser.uid && task.status === 'aprobado-dir') {
+                         container.appendChild(this.createButton('button', 'Marcar como Finalizada', 'bg-gray-500', () => taskDocRef.update({ status: 'finalizado' })));
+                    }
+                },
+
+                createButton(type, text, className, onClick) {
+                    const button = document.createElement('button');
+                    button.type = type;
+                    button.textContent = text;
+                    button.className = `${className} text-white font-bold py-2 px-4 rounded-lg`;
+                    if (onClick) button.onclick = onClick;
+                    return button;
+                },
+
+                closeModal() {
+                    App.ui.elements.taskModal.classList.remove('is-open');
+                },
+
+                async handleSubmit(e) {
+                    e.preventDefault();
+                    const taskId = document.getElementById('task-id').value;
+                    const assigneeSelect = document.getElementById('task-assignee');
+                    
+                    const taskData = {
+                        title: document.getElementById('task-title').value,
+                        description: document.getElementById('task-description').value,
+                        assigneeId: assigneeSelect.value,
+                        assigneeName: assigneeSelect.selectedOptions[0].text,
+                        dueDate: document.getElementById('task-due-date').value,
+                        updatedAt: serverTimestamp(),
+                    };
+
+                    if (taskId) {
+                        await db.collection("tasks").doc(taskId).update(taskData);
+                    } else {
+                        taskData.creatorId = App.state.currentUser.uid;
+                        taskData.creatorName = App.state.currentUser.displayName;
+                        taskData.status = 'solicitado';
+                        taskData.createdAt = serverTimestamp();
+                        await db.collection("tasks").add(taskData);
+                    }
+                    App.tasks.closeModal();
+                },
+
+                async populateUsersDropdown() {
+                    const userSelect = document.getElementById('task-assignee');
+                    userSelect.innerHTML = '<option value="">Seleccionar usuario</option>';
+                    const snapshot = await db.collection("users").orderBy('displayName').get();
+                    snapshot.forEach(doc => {
+                        const user = doc.data();
+                        const option = document.createElement('option');
+                        option.value = user.uid;
+                        option.textContent = user.displayName;
+                        userSelect.appendChild(option);
+                    });
+                }
+            },
+            
+            dashboard: {
+                async load() {
+                    const snapshot = await db.collection("tasks").get();
+                    const tasksByUser = {};
+                    snapshot.forEach(doc => {
+                        const task = doc.data();
+                        if (task.assigneeName) {
+                            tasksByUser[task.assigneeName] = (tasksByUser[task.assigneeName] || 0) + 1;
+                        }
+                    });
+                    
+                    App.ui.elements.statsContainer.innerHTML = '';
+                    const chartCanvas = document.createElement('canvas');
+                    App.ui.elements.statsContainer.appendChild(chartCanvas);
+
+                    new Chart(chartCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(tasksByUser),
+                            datasets: [{
+                                label: 'Tareas por Usuario',
+                                data: Object.values(tasksByUser),
+                                backgroundColor: 'rgba(76, 146, 0, 0.5)',
+                                borderColor: 'rgba(76, 146, 0, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { scales: { y: { beginAtZero: true, stepSize: 1 } } }
+                    });
+                }
+            },
+            
+            admin: {
+                async load() {
+                    const { currentUserRole } = App.state;
+                    if (currentUserRole !== 'director' && currentUserRole !== 'coordinador') return;
+                    
+                    const tableContainer = App.ui.elements.userManagementTable;
+                    tableContainer.innerHTML = `
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-hgio-blue text-white">
+                                <tr>
+                                    <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Usuario</th>
+                                    <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Email</th>
+                                    <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Rol</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-list-tbody"></tbody>
+                        </table>`;
+
+                    const tableBody = document.getElementById('user-list-tbody');
+                    const snapshot = await db.collection("users").orderBy('displayName').get();
+                    snapshot.forEach(doc => {
+                        tableBody.appendChild(this.renderUserRow(doc.data()));
+                    });
+                },
+
+                renderUserRow(user) {
+                    const row = document.createElement('tr');
+                    const { currentUserRole } = App.state;
+
+                    row.innerHTML = `
+                        <td class="text-left py-3 px-4">${user.displayName}</td>
+                        <td class="text-left py-3 px-4">${user.email}</td>
+                        <td class="text-left py-3 px-4"></td>`;
+
+                    const select = document.createElement('select');
+                    select.className = "role-select border rounded-md p-1";
+                    select.dataset.uid = user.uid;
+                    if (currentUserRole !== 'director') select.disabled = true;
+
+                    ['equipo', 'coordinador', 'director'].forEach(role => {
+                        const option = document.createElement('option');
+                        option.value = role;
+                        option.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+                        if (user.role === role) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => this.updateUserRole(e.target.dataset.uid, e.target.value));
+                    row.cells[2].appendChild(select);
+
+                    return row;
+                },
+
+                async updateUserRole(uid, newRole) {
+                    try {
+                        await db.collection("users").doc(uid).update({ role: newRole });
+                        // Opcional: mostrar una notificación de éxito
+                    } catch (error) {
+                        console.error("Error al actualizar el rol:", error);
+                        alert("No se pudo actualizar el rol.");
+                    }
+                }
+            },
+
+            // --- MÉTODO DE INICIALIZACIÓN GENERAL ---
+            init() {
+                auth.onAuthStateChanged(this.auth.handleAuthStateChange);
+                
+                this.ui.elements.googleSigninButton.addEventListener('click', this.auth.signInWithGoogle);
+                this.ui.elements.logoutButton.addEventListener('click', this.auth.signOut);
+                this.ui.elements.createTaskBtn.addEventListener('click', () => this.tasks.openModal());
+                this.ui.elements.taskForm.addEventListener('submit', (e) => this.tasks.handleSubmit(e));
+                this.ui.elements.closeModalBtns.forEach(btn => btn.addEventListener('click', this.tasks.closeModal));
+
+                this.ui.elements.tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        this.ui.elements.tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        const tabName = tab.dataset.tab;
+                        this.ui.elements.tabContents.forEach(content => {
+                            content.classList.remove('active');
+                            if (content.id === `${tabName}-content`) {
+                                content.classList.add('active');
+                            }
+                        });
+                        // Carga de contenido on-demand
+                        if(tabName === 'dashboard') this.dashboard.load();
+                        if(tabName === 'admin') this.admin.load();
                     });
                 });
-                calendar.getEventSources().forEach(source => source.remove());
-                calendar.addEventSource(events);
-            });
-        }
-
-        // --- MODAL DE TAREAS ---
-        async function openTaskModal(taskId = null) {
-            taskForm.reset();
-            await populateUsersDropdown();
-
-            const taskDetailsReadonly = document.getElementById('task-details-readonly');
-            const taskModalFooter = document.getElementById('task-modal-footer');
-            const formInputs = [
-                document.getElementById('task-title'),
-                document.getElementById('task-description'),
-                document.getElementById('task-assignee'),
-                document.getElementById('task-due-date')
-            ];
-
-            taskDetailsReadonly.classList.add('hidden');
-            taskModalFooter.innerHTML = '';
-            formInputs.forEach(input => {
-                input.disabled = false;
-                input.style.display = 'block';
-            });
-
-
-            if (taskId) {
-                taskModalTitle.textContent = 'Detalles de la Tarea';
-                const taskDocRef = db.collection("tasks").doc(taskId);
-                const taskDoc = await taskDocRef.get();
-
-                if (taskDoc.exists) {
-                    const task = taskDoc.data();
-                    document.getElementById('task-id').value = taskId;
-                    
-                    if (currentUser.uid !== task.creatorId && currentUserRole === 'equipo') {
-                        formInputs.forEach(input => input.style.display = 'none');
-                        taskDetailsReadonly.classList.remove('hidden');
-                        taskDetailsReadonly.innerHTML = `
-                            <p><strong>Título:</strong> ${task.title}</p>
-                            <p><strong>Descripción:</strong> ${task.description || ''}</p>
-                            <p><strong>Asignado a:</strong> ${task.assigneeName}</p>
-                            <p><strong>Fecha de Entrega:</strong> ${task.dueDate}</p>
-                            <p><strong>Estado:</strong> <span class="status-badge status-${task.status}">${task.status}</span></p>
-                        `;
-                    } else {
-                        document.getElementById('task-title').value = task.title;
-                        document.getElementById('task-description').value = task.description;
-                        document.getElementById('task-assignee').value = task.assigneeId;
-                        document.getElementById('task-due-date').value = task.dueDate;
-                    }
-
-                    addWorkflowButtons(taskModalFooter, task, taskId);
-                }
-            } else {
-                taskModalTitle.textContent = 'Crear Nueva Tarea';
-                document.getElementById('task-id').value = '';
-                taskModalFooter.innerHTML = '<button type="submit" class="bg-hgio-green text-white font-bold py-2 px-5 rounded-lg">Guardar Tarea</button>';
             }
-            taskModal.classList.add('is-open');
-        }
+        };
 
-        function addWorkflowButtons(container, task, taskId) {
-            container.innerHTML = '';
-            const taskDocRef = db.collection("tasks").doc(taskId);
+        // --- INICIAR LA APLICACIÓN ---
+        App.init();
 
-            if (currentUser.uid === task.creatorId || currentUserRole === 'coordinador' || currentUserRole === 'director') {
-                const saveButton = document.createElement('button');
-                saveButton.type = 'submit';
-                saveButton.className = 'bg-hgio-blue text-white font-bold py-2 px-4 rounded-lg';
-                saveButton.textContent = 'Guardar Cambios';
-                container.appendChild(saveButton);
-            }
-
-            if (currentUserRole === 'coordinador' && task.status === 'solicitado') {
-                const approveButton = document.createElement('button');
-                approveButton.type = 'button';
-                approveButton.className = 'bg-green-500 text-white font-bold py-2 px-4 rounded-lg';
-                approveButton.textContent = 'Aprobar (Coord.)';
-                approveButton.onclick = () => taskDocRef.update({ status: 'aprobado-coord' });
-                container.appendChild(approveButton);
-            }
-            
-            if (currentUserRole === 'director' && task.status === 'aprobado-coord') {
-                const approveButton = document.createElement('button');
-                approveButton.type = 'button';
-                approveButton.className = 'bg-green-700 text-white font-bold py-2 px-4 rounded-lg';
-                approveButton.textContent = 'Aprobar (Dir.)';
-                approveButton.onclick = () => taskDocRef.update({ status: 'aprobado-dir' });
-                container.appendChild(approveButton);
-            }
-
-            if ((currentUserRole === 'coordinador' && task.status === 'solicitado') || (currentUserRole === 'director' && task.status === 'aprobado-coord')) {
-                const rejectButton = document.createElement('button');
-                rejectButton.type = 'button';
-                rejectButton.className = 'bg-red-500 text-white font-bold py-2 px-4 rounded-lg';
-                rejectButton.textContent = 'Rechazar';
-                rejectButton.onclick = () => taskDocRef.update({ status: 'rechazado' });
-                container.appendChild(rejectButton);
-            }
-
-            if (task.assigneeId === currentUser.uid && task.status === 'aprobado-dir') {
-                 const completeButton = document.createElement('button');
-                completeButton.type = 'button';
-                completeButton.className = 'bg-gray-500 text-white font-bold py-2 px-4 rounded-lg';
-                completeButton.textContent = 'Marcar como Finalizada';
-                completeButton.onclick = () => taskDocRef.update({ status: 'finalizado' });
-                container.appendChild(completeButton);
-            }
-        }
-
-        function closeTaskModal() {
-            taskModal.classList.remove('is-open');
-        }
-
-        createTaskBtn.addEventListener('click', () => openTaskModal());
-        closeModalBtns.forEach(btn => btn.addEventListener('click', closeTaskModal));
-
-        // --- DASHBOARD ---
-        async function loadDashboard() {
-            const snapshot = await db.collection("tasks").get();
-            
-            const tasksByUser = {};
-            snapshot.forEach(doc => {
-                const task = doc.data();
-                if (task.assigneeName) {
-                    if (tasksByUser[task.assigneeName]) {
-                        tasksByUser[task.assigneeName]++;
-                    } else {
-                        tasksByUser[task.assigneeName] = 1;
-                    }
-                }
-            });
-
-            const statsContainer = document.getElementById('stats-container');
-            statsContainer.innerHTML = '';
-
-            const chartCanvas = document.createElement('canvas');
-            statsContainer.appendChild(chartCanvas);
-
-            new Chart(chartCanvas, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(tasksByUser),
-                    datasets: [{
-                        label: 'Tareas por Usuario',
-                        data: Object.values(tasksByUser),
-                        backgroundColor: 'rgba(76, 146, 0, 0.5)',
-                        borderColor: 'rgba(76, 146, 0, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-
-        document.querySelector('.tab-btn[data-tab="dashboard"]').addEventListener('click', loadDashboard);
-
-        // --- ADMIN ---
-        async function loadAdminView() {
-            if (currentUserRole !== 'director' && currentUserRole !== 'coordinador') return;
-
-            const userManagementTable = document.getElementById('user-management-table');
-            userManagementTable.innerHTML = `
-                <table class="min-w-full bg-white">
-                    <thead class="bg-hgio-blue text-white">
-                        <tr>
-                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Usuario</th>
-                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Email</th>
-                            <th class="text-left py-3 px-4 uppercase font-semibold text-sm">Rol</th>
-                        </tr>
-                    </thead>
-                    <tbody id="user-list"></tbody>
-                </table>`;
-
-            const userList = document.getElementById('user-list');
-            const snapshot = await db.collection("users").get();
-
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                const userRow = document.createElement('tr');
-                userRow.innerHTML = `
-                    <td class="text-left py-3 px-4">${user.displayName}</td>
-                    <td class="text-left py-3 px-4">${user.email}</td>
-                    <td class="text-left py-3 px-4">
-                        <select class="role-select border rounded-md p-1" data-uid="${user.uid}" ${currentUserRole !== 'director' ? 'disabled' : ''}>
-                            <option value="equipo" ${user.role === 'equipo' ? 'selected' : ''}>Equipo</option>
-                            <option value="coordinador" ${user.role === 'coordinador' ? 'selected' : ''}>Coordinador</option>
-                            <option value="director" ${user.role === 'director' ? 'selected' : ''}>Director</option>
-                        </select>
-                    </td>
-                `;
-                userList.appendChild(userRow);
-            });
-
-            document.querySelectorAll('.role-select').forEach(select => {
-                select.addEventListener('change', async (e) => {
-                    const newRole = e.target.value;
-                    const uid = e.target.dataset.uid;
-                    await db.collection("users").doc(uid).update({ role: newRole });
-                });
-            });
-        }
-
-        document.querySelector('.tab-btn[data-tab="admin"]').addEventListener('click', loadAdminView);
-
-        async function populateUsersDropdown() {
-            const userSelect = document.getElementById('task-assignee');
-            userSelect.innerHTML = '<option value="">Seleccionar usuario</option>';
-            const snapshot = await db.collection("users").get();
-            snapshot.forEach(doc => {
-                const user = doc.data();
-                const option = document.createElement('option');
-                option.value = user.uid;
-                option.textContent = user.displayName;
-                userSelect.appendChild(option);
-            });
-        }
-
-        taskForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const taskId = document.getElementById('task-id').value;
-            const title = document.getElementById('task-title').value;
-            const description = document.getElementById('task-description').value;
-            const assigneeId = document.getElementById('task-assignee').value;
-            const dueDate = document.getElementById('task-due-date').value;
-            
-            const assigneeName = document.getElementById('task-assignee').selectedOptions[0].text;
-
-            const taskData = {
-                title,
-                description,
-                assigneeId,
-                assigneeName,
-                dueDate,
-                creatorId: currentUser.uid,
-                creatorName: currentUser.displayName,
-                status: 'solicitado',
-                updatedAt: serverTimestamp(),
-            };
-
-            if (taskId) {
-                await db.collection("tasks").doc(taskId).update(taskData);
-            } else {
-                taskData.createdAt = serverTimestamp();
-                await db.collection("tasks").add(taskData);
-            }
-
-            closeTaskModal();
-        });
     </script>
 </body>
 </html>
