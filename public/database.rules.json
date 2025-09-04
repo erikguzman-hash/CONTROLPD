@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      },
+      // Un director puede escribir el rol de cualquier usuario
+      "$uid/role": {
+        ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'director'"
+      }
+    },
+    "tasks": {
+      ".read": "auth != null",
+      "$taskId": {
+        // Cualquiera puede crear una tarea
+        ".create": "auth != null",
+        // Quién puede actualizar una tarea:
+        ".update": "auth != null && (resource.data.creatorId == request.auth.uid || resource.data.assigneeId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'coordinador' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'director')",
+        // Quién puede borrar una tarea:
+        ".delete": "auth != null && (resource.data.creatorId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'director')"
+      }
+    }
+  }
+}
