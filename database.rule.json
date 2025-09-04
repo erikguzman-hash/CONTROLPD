@@ -1,0 +1,5 @@
+{
+  "rules": {
+    "rules": "allow read, write: if true;"
+  }
+}
