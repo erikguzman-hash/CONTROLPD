@@ -130,12 +130,23 @@
         </div>
     </div>
     
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB8-KNE_60SD9OmavwOG816L5dGxOAgzO4",
+            authDomain: "weekpd.firebaseapp.com",
+            projectId: "weekpd",
+            storageBucket: "weekpd.firebasestorage.app",
+            messagingSenderId: "712077553599",
+            appId: "1:712077553599:web:07fa4b6309af0e50ecfb0a",
+            measurementId: "G-CXM1ZQ7VFL"
+        };
+    </script>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     
-    <script type="module">
-        import { firebaseConfig } from './firebase-config.js';
+    <script>
 
         // --- INICIALIZACIÓN DE FIREBASE ---
         firebase.initializeApp(firebaseConfig);
