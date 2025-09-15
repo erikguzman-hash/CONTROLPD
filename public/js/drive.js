@@ -1,4 +1,5 @@
-const GOOGLE_CLIENT_ID = "712077553599-a4h1h9egeimrg2i47sn5usps7n3ek3es.apps.googleusercontent.com";
+import { GOOGLE_CLIENT_ID } from './env-config.js';
+
 const GOOGLE_API_SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
