@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log de Auditoría - HGIO Talleres</title>
+    <link rel="icon" type="image/x-icon" href="https://hgio-basics-images.s3.us-east-1.amazonaws.com/hgio-logos/apps-logos/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Montserrat', 'sans-serif'] },
+                    colors: { 'hgio-blue': { DEFAULT: '#153054', dark: '#102440' }, 'hgio-green': { DEFAULT: '#4c9200', light: '#80ba27' }, 'hgio-gray': '#858482' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-image: url('https://hgio-basics-images.s3.us-east-1.amazonaws.com/hgio-fondos/background.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .loader { border-top-color: #4c9200; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="https://hgio.co/wp-content/uploads/Logo_Transparente-41.webp" alt="Logo HGIO" class="h-12 w-auto object-contain">
+                <h1 class="text-xl font-bold text-hgio-blue">Registro de Auditoría</h1>
+            </div>
+            <!-- CORRECCIÓN: Se usa una ruta relativa a la raíz para evitar errores de navegación. -->
+            <a href="/admin.html" class="text-sm bg-hgio-blue text-white py-2 px-4 rounded-md font-semibold">Volver al Panel</a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div id="loading-view" class="text-center py-10">
+            <div class="loader h-24 w-24 mx-auto"></div>
+            <p class="mt-4 text-lg">Cargando registros...</p>
+        </div>
+        <div id="error-view" class="hidden text-center py-10 bg-white p-8 rounded-lg shadow-md">
+            <h1 class="text-2xl font-bold text-red-600">Error</h1>
+            <p id="error-message" class="text-gray-600 mt-2"></p>
+        </div>
+        <div id="log-container" class="hidden bg-white p-6 rounded-lg shadow-md">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Administrador</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Taller Afectado</th>
+                    </tr>
+                </thead>
+                <tbody id="log-table-body" class="bg-white divide-y divide-gray-200">
+                    <!-- Los registros del log se insertarán aquí -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvp0WZ7iWCmS-UIaSFOJvpcrIoQksigJI",
+            authDomain: "aplicativo-talleres-hgio.firebaseapp.com",
+            projectId: "aplicativo-talleres-hgio",
+            storageBucket: "aplicativo-talleres-hgio.firebasestorage.app",
+            messagingSenderId: "143507864345",
+            appId: "1:143507864345:web:284f08cf7c66022d86e388",
+            measurementId: "G-SXR7H8YGCD"
+        };
+
+        const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const loadingView = document.getElementById('loading-view');
+        const errorView = document.getElementById('error-view');
+        const errorMessage = document.getElementById('error-message');
+        const logContainer = document.getElementById('log-container');
+        const logTableBody = document.getElementById('log-table-body');
+
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                loadLogs();
+            } else {
+                showError("Necesitas iniciar sesión como administrador para ver el registro de auditoría.");
+            }
+        });
+
+        async function loadLogs() {
+            try {
+                const q = query(collection(db, "audit_logs"), orderBy("fecha", "desc"));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    showError("No hay registros de auditoría para mostrar.");
+                    return;
+                }
+
+                logTableBody.innerHTML = '';
+                querySnapshot.forEach(doc => {
+                    const log = doc.data();
+                    const tr = document.createElement('tr');
+                    const formattedDate = log.fecha ? new Date(log.fecha.seconds * 1000).toLocaleString('es-CO') : 'N/A';
+                    
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formattedDate}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${log.adminEmail}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${log.accion}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${log.tallerTitulo}</td>
+                    `;
+                    logTableBody.appendChild(tr);
+                });
+
+                loadingView.classList.add('hidden');
+                logContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error al cargar los logs:", error);
+                let userMessage = "Ocurrió un error al cargar los registros.";
+                if (error.code === 'failed-precondition') {
+                    userMessage = "Falta un índice en la base de datos para poder ordenar los registros. Abre la consola de desarrollador (F12) y busca un enlace en el mensaje de error para crearlo automáticamente.";
+                }
+                showError(userMessage);
+            }
+        }
+
+        function showError(message) {
+            loadingView.classList.add('hidden');
+            errorMessage.textContent = message;
+            errorView.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -2,30 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
+    function isAuth() {
       return request.auth != null;
     }
 
-    // Helper function to get user's role
-    function getUserRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    function userRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : '';
     }
 
-    // Users Collection
+    function isOneOfRoles(roles) {
+      return isAuth() && userRole() in roles;
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || getUserRole(request.auth.uid) == 'coordinador' || getUserRole(request.auth.uid) == 'director');
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && (request.auth.uid == userId || getUserRole(request.auth.uid) == 'director');
-      allow delete: if false; // No deletion of users
+      allow read: if isAuth();
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId || isOneOfRoles(['director']);
     }
 
-    // Tasks Collection
     match /tasks/{taskId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.creatorId || request.auth.uid == resource.data.assigneeId || getUserRole(request.auth.uid) == 'coordinador' || getUserRole(request.auth.uid) == 'director');
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (request.auth.uid == resource.data.creatorId || request.auth.uid == resource.data.assigneeId || getUserRole(request.auth.uid) == 'coordinador' || getUserRole(request.auth.uid) == 'director');
-      allow delete: if isAuthenticated() && getUserRole(request.auth.uid) == 'director';
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == request.resource.data.creatorId;
+
+      allow update: if isAuth() && (
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        resource.data.get('assigneeId', '') == request.auth.uid ||
+        isOneOfRoles(['coordinador', 'director'])
+      );
+      allow delete: if isAuth() && (
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        isOneOfRoles(['director'])
+      );
     }
   }
 }
