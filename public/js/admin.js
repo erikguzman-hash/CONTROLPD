@@ -2,7 +2,7 @@ import { elements } from './ui.js';
 import { getUsersForAdmin, updateUserRoleInDb, updateUserPapersInDb } from './firestore.js';
 
 const ROLES = ['miembro', 'director', 'administrador'];
-const PAPERS = ['coordinador', 'experto', 'revisor', 'productor'];
+const PAPERS = ['coordinador', 'experto', 'revisor', 'productor', 'publicador'];
 
 async function updateUserRole(db, uid, newRole) {
     try {

@@ -71,6 +71,22 @@ function init() {
             if (tabName === 'dashboard') dashboardModule.loadDashboard(db);
         });
     });
+
+    elements.modalTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            elements.modalTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            const tabName = tab.dataset.tab;
+            elements.modalTabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tabName}-content-modal`) {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
 }
 
 // --- 5. RUN APP ---

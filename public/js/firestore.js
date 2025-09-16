@@ -37,18 +37,42 @@ export function listenForTasks(dependencies) {
     });
 }
 
-export async function populateUsersDropdown(db, elementId, paper = null) {
+export async function populateUsersDropdown(db, elementId, papers = null) {
     const userSelect = document.getElementById(elementId);
     userSelect.innerHTML = '<option value="">Seleccionar usuario</option>';
     
-    let usersQuery = query(collection(db, "users"), orderBy('displayName'));
-    if (paper) {
-        usersQuery = query(collection(db, "users"), where('papers', 'array-contains', paper), orderBy('displayName'));
+    if (!papers) {
+        const usersQuery = query(collection(db, "users"), orderBy('displayName'));
+        const snapshot = await getDocs(usersQuery);
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            const option = document.createElement('option');
+            option.value = user.uid;
+            option.textContent = user.displayName;
+            userSelect.appendChild(option);
+        });
+        return;
     }
 
-    const snapshot = await getDocs(usersQuery);
-    snapshot.forEach(doc => {
-        const user = doc.data();
+    if (typeof papers === 'string') {
+        papers = [papers];
+    }
+
+    const users = new Map();
+    for (const paper of papers) {
+        const usersQuery = query(collection(db, "users"), where('papers', 'array-contains', paper), orderBy('displayName'));
+        const snapshot = await getDocs(usersQuery);
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            if (!users.has(user.uid)) {
+                users.set(user.uid, user);
+            }
+        });
+    }
+
+    const sortedUsers = Array.from(users.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    sortedUsers.forEach(user => {
         const option = document.createElement('option');
         option.value = user.uid;
         option.textContent = user.displayName;
@@ -91,16 +115,22 @@ export async function getTasksForUser(db, userId) {
     const q1 = query(collection(db, "tasks"), where('creatorId', '==', userId));
     const q2 = query(collection(db, "tasks"), where('expertId', '==', userId));
     const q3 = query(collection(db, "tasks"), where('producerId', '==', userId));
+    const q4 = query(collection(db, "tasks"), where('revisorId', '==', userId));
+    const q5 = query(collection(db, "tasks"), where('publicadorId', '==', userId));
 
-    const [creatorTasks, expertTasks, producerTasks] = await Promise.all([
+    const [creatorTasks, expertTasks, producerTasks, revisorTasks, publicadorTasks] = await Promise.all([
         getDocs(q1),
         getDocs(q2),
-        getDocs(q3)
+        getDocs(q3),
+        getDocs(q4),
+        getDocs(q5)
     ]);
 
     creatorTasks.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
     expertTasks.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
     producerTasks.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+    revisorTasks.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+    publicadorTasks.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
 
     return Array.from(tasksMap.values());
 }

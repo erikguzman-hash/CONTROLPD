@@ -1,3 +1,4 @@
+console.log("auth.js loaded");
 import { GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { showView, updateUserInfo, resetAppView } from './ui.js';
 import { getUser, createUser, listenForTasks } from './firestore.js';
@@ -25,7 +26,7 @@ export async function handleAuthStateChange(dependencies, user) {
             appState.currentUserPapers = defaultPapers;
         }
         
-        updateUserInfo(user, appState.currentUserRole);
+        updateUserInfo(user, appState.currentUserRole, appState.currentUserPapers);
         showView('app');
         
         loadAdmin(dependencies);
@@ -57,11 +58,15 @@ export async function signOutFromApp(auth) {
     }
 }
 
-export async function signOutFromApp(auth) {
+export async function signInWithGoogle(auth, dependencies) {
+    const provider = new GoogleAuthProvider();
     try {
-        await signOut(auth);
+        const result = await signInWithPopup(auth, provider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential.accessToken;
+        dependencies.appState.googleAccessToken = token;
     } catch (error) {
-        console.error("Error al cerrar sesión:", error);
-        alert("Error al cerrar sesión. Verifica la consola para más detalles.");
+        console.error("Error al iniciar sesión con Google:", error);
+        alert("Error al iniciar sesión con Google. Verifica la consola para más detalles.");
     }
 }

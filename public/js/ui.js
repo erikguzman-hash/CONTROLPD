@@ -1,3 +1,4 @@
+console.log("ui.js new version loaded");
 export const elements = {
     loadingView: document.getElementById('loading-view'),
     loginView: document.getElementById('login-view'),
@@ -7,9 +8,10 @@ export const elements = {
     createTaskBtn: document.getElementById('create-task-btn'),
     userNameSpan: document.getElementById('user-name'),
     userRoleSpan: document.getElementById('user-role'),
-    adminTabBtn: document.getElementById('admin-tab-btn'),
     tabs: document.querySelectorAll('.tab-btn'),
     tabContents: document.querySelectorAll('.tab-content'),
+    modalTabs: document.querySelectorAll('.tab-btn-modal'),
+    modalTabContents: document.querySelectorAll('.tab-content-modal'),
     taskModal: document.getElementById('task-modal'),
     taskModalTitle: document.getElementById('task-modal-title'),
     taskModalFooter: document.getElementById('task-modal-footer'),
@@ -29,20 +31,20 @@ export function showView(view) {
     if (view === 'app') elements.appView.classList.remove('hidden');
 }
 
-export function updateUserInfo(user, role) {
+export function updateUserInfo(user, role, papers = []) {
     elements.userNameSpan.textContent = user.displayName;
     const roleCapitalized = role.charAt(0).toUpperCase() + role.slice(1);
     elements.userRoleSpan.textContent = roleCapitalized;
-    if (role === 'director' || role === 'administrador') {
-        elements.adminTabBtn.classList.remove('hidden');
+
+    if (papers.includes('coordinador')) {
+        elements.createTaskBtn.classList.remove('hidden');
     } else {
-        elements.adminTabBtn.classList.add('hidden');
+        elements.createTaskBtn.classList.add('hidden');
     }
 }
 
 export function resetAppView(appState) {
      if (appState.unsubscribeTasks) appState.unsubscribeTasks();
-     elements.adminTabBtn.classList.add('hidden');
      elements.userNameSpan.textContent = '';
      elements.userRoleSpan.textContent = '';
 }
