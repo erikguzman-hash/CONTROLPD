@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -11,81 +12,70 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
+import { onAllTasksSnapshot } from '@/lib/firestore';
 
-// Register the necessary components with Chart.js
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
+  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement
 );
-
-// Sample data for the charts
-const barData = {
-  labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-  datasets: [
-    {
-      label: 'Tareas Completadas',
-      data: [12, 19, 3, 5, 2, 3],
-      backgroundColor: '#4c9200',
-    },
-    {
-      label: 'Tareas Pendientes',
-      data: [2, 3, 20, 5, 1, 4],
-      backgroundColor: '#153054',
-    },
-  ],
-};
-
-const doughnutData = {
-  labels: ['Finalizado', 'Pendiente', 'En Revisión', 'Aprobado'],
-  datasets: [
-    {
-      label: 'Estado de Tareas',
-      data: [300, 50, 100, 80],
-      backgroundColor: [
-        '#E5E7EB', // Finalizado
-        '#FEF3C7', // Pendiente
-        '#D1FAE5', // En Revisión (using aprobado-coord color)
-        '#C6F6D5', // Aprobado (using aprobado-dir color)
-      ],
-      borderColor: [
-        '#374151',
-        '#92400E',
-        '#065F46',
-        '#22543D',
-      ],
-      borderWidth: 1,
-    },
-  ],
-};
 
 const chartOptions = {
   responsive: true,
   plugins: {
-    legend: {
-      position: 'top' as const,
-    },
-    title: {
-      display: true,
-      text: 'Resumen de Tareas',
-    },
+    legend: { position: 'top' as const },
   },
 };
 
+// Initial empty data
+const initialDoughnutData = {
+  labels: [],
+  datasets: [{ data: [] }],
+};
+
 export default function DashboardView() {
+  const [doughnutData, setDoughnutData] = useState(initialDoughnutData);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAllTasksSnapshot((tasks) => {
+      // Aggregate data for doughnut chart (tasks by status)
+      const statusCounts = tasks.reduce((acc, task) => {
+        const status = task.status || 'Sin Estado';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as { [key: string]: number });
+
+      const labels = Object.keys(statusCounts);
+      const data = Object.values(statusCounts);
+
+      setDoughnutData({
+        labels,
+        datasets: [
+          {
+            label: 'Estado de Tareas',
+            data,
+            backgroundColor: [ // Add more colors if you have more statuses
+              '#E5E7EB', '#FEF3C7', '#D1FAE5', '#C6F6D5', '#FEE2E2', '#BFDBFE',
+            ],
+          },
+        ],
+      });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="bg-white p-4 rounded-lg shadow-md">
         <h3 className="text-lg font-bold text-hgio-blue mb-4">Tareas por Mes</h3>
-        <Bar options={chartOptions} data={barData} />
+        {/* Bar chart data needs a similar aggregation by month, which is more complex.
+            For now, we'll leave it as a placeholder. */}
+        <p>Gráfico de barras por mes (próximamente).</p>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-md">
         <h3 className="text-lg font-bold text-hgio-blue mb-4">Distribución de Estados</h3>
-        <Doughnut data={doughnutData} />
+        {loading ? <p>Cargando datos...</p> : <Doughnut data={doughnutData} options={chartOptions} />}
       </div>
     </div>
   );

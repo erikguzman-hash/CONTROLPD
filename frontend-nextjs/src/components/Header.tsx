@@ -1,14 +1,9 @@
 import Image from 'next/image';
-
-// Define a type for the user object
-type User = {
-  displayName: string;
-  role: string;
-  // other properties...
-};
+import { AppUser } from '@/context/AuthContext';
+import { signOutFromApp } from '@/lib/auth'; // Import sign out function
 
 type HeaderProps = {
-  user: User;
+  user: AppUser;
 };
 
 export default function Header({ user }: HeaderProps) {
@@ -27,10 +22,13 @@ export default function Header({ user }: HeaderProps) {
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-right">
-            <span className="font-semibold text-hgio-blue block">{user.displayName}</span>
-            <span className="text-xs text-hgio-gray block">{user.role}</span>
+            <span className="font-semibold text-hgio-blue block">{user.displayName || 'Usuario'}</span>
+            <span className="text-xs text-hgio-gray block">{user.role || 'Miembro'}</span>
           </div>
-          <button className="text-sm bg-hgio-blue text-white py-2 px-4 rounded-md font-semibold">
+          <button
+            onClick={signOutFromApp}
+            className="text-sm bg-hgio-blue text-white py-2 px-4 rounded-md font-semibold"
+          >
             Cerrar Sesión
           </button>
         </div>
